@@ -56,6 +56,7 @@ Vendor housekeeping (browser and driver updaters, OEM utilities, telemetry helpe
 | Fedora, Linux Mint, Debian, Arch, AMD GPUs | ❓ untested. The method applies; package names and the initramfs step differ. Reports welcome |
 | `jellyfin-carry-userdata.py`, Jellyfin 10.11+ database (EF Core `jellyfin.db`) | ✅ checked against a real Windows → Linux move: identical result to the hand-made import |
 | `windows/*.ps1` on Windows 11, PowerShell 5.1, elevated | ✅ run on a real machine (preflight, export, Pester 43/43); Windows 10 untested, no CI |
+| Task or service names with accents or other non-ASCII characters | ⚠️ untested on real Windows (none on the test machine). The generated `.ps1` files are written UTF-8 with BOM so PowerShell 5.1 should read them correctly; reports welcome |
 
 `copy-from-windows.sh --root DIR` works from an already-mounted C: or a backup copy, without needing sudo.
 
