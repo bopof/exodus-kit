@@ -101,9 +101,12 @@ fi
 
 if [[ ! -e $cred ]]; then
   [[ -t 0 ]] || die "$cred does not exist and there's no terminal to ask for the password"
-  read -rp "SMB user for //$server/$share: " smb_user
-  read -rsp "Password (not shown): " smb_pass; echo
-  install -d -m 700 "$(dirname "$cred")"
+  # IFS= keeps leading/trailing spaces: a password is taken exactly as typed.
+  IFS= read -rp "SMB user for //$server/$share: " smb_user || die "no user name given"
+  [[ -n $smb_user ]] || die "no user name given"
+  IFS= read -rsp "Password (not shown): " smb_pass || { echo; die "no password given"; }; echo
+  # Create the folder 700 only if it's new: never chmod an existing one (e.g. --cred /etc/samba/x.cred).
+  [[ -d $(dirname "$cred") ]] || install -d -m 700 "$(dirname "$cred")"
   ( umask 077; printf 'username=%s\npassword=%s\n' "$smb_user" "$smb_pass" > "$cred" )
   unset smb_pass
   echo "wrote $cred (mode 600)"

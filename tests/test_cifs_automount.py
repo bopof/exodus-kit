@@ -87,6 +87,42 @@ class CifsAutomount(unittest.TestCase):
         self.assertIn("no terminal", p.stderr)
         self.assertEqual(self.cifs_lines(), [])
 
+    def prompt_run(self, answers, cred):
+        """Run --apply under a pseudo-terminal (util-linux `script`) so the user/password prompt fires."""
+        if not shutil.which("script"):
+            self.skipTest("util-linux script not installed")
+        cmd = " ".join(f"'{a}'" for a in ["bash", str(SCRIPT), "--server", "nas.lan", "--share", "My Shows",
+                                          "--mount", str(self.mnt), "--cred", str(cred), "--owner",
+                                          getpass.getuser(), "--fstab", str(self.fstab), "--dropin-dir",
+                                          str(self.d / "systemd"), "--no-reload", "--apply"])
+        return subprocess.run(["script", "-qec", cmd, "/dev/null"], input=answers, capture_output=True, text=True)
+
+    def test_prompt_writes_cred_exactly_as_typed(self):
+        cred = self.d / "new" / "nas.cred"
+        pw = "  sp@ce w\\rd$x  "  # leak-check: allow
+        p = self.prompt_run(f"bob\n{pw}\n", cred)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertEqual(cred.read_text(), f"username=bob\npassword={pw}\n")
+        self.assertEqual(cred.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(cred.parent.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(len(self.cifs_lines()), 1)
+
+    def test_prompt_leaves_existing_folder_mode_alone(self):
+        shared = self.d / "shared"
+        shared.mkdir(mode=0o755)
+        shared.chmod(0o755)
+        p = self.prompt_run("bob\npw\n", shared / "nas.cred")
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertEqual(shared.stat().st_mode & 0o777, 0o755)
+        self.assertEqual((shared / "nas.cred").stat().st_mode & 0o777, 0o600)
+
+    def test_prompt_empty_user_refuses(self):
+        cred = self.d / "new" / "nas.cred"
+        p = self.prompt_run("\n", cred)
+        self.assertEqual(p.returncode, 1)
+        self.assertFalse(cred.exists())
+        self.assertEqual(self.cifs_lines(), [])
+
     def test_bad_input(self):
         self.assertEqual(self.run_it(share="a,b").returncode, 1)
         self.assertEqual(self.run_it(mnt="relative/dir").returncode, 1)
