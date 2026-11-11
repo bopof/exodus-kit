@@ -578,6 +578,7 @@ $failed = 0
 foreach ($t in $Tasks) {
   $st = Get-ScheduledTask -TaskPath $t.Path -TaskName $t.Name -ErrorAction SilentlyContinue
   if (-not $st) { Write-Warning "task not found: $($t.Path)$($t.Name)"; continue }
+  if ($st.State -eq 'Disabled') { "already disabled  $($t.Path)$($t.Name)"; continue }
   if ($DryRun) { "would disable task  $($t.Path)$($t.Name) (now $($st.State))"; continue }
   try { Disable-ScheduledTask -InputObject $st | Out-Null; "disabled task  $($t.Path)$($t.Name)" }
   catch { Write-Warning "could not disable $($t.Path)$($t.Name): $_"; $failed++ }
@@ -585,6 +586,7 @@ foreach ($t in $Tasks) {
 foreach ($s in $Services) {
   $svc = Get-Service -Name $s.Name -ErrorAction SilentlyContinue
   if (-not $svc) { Write-Warning "service not found: $($s.Name)"; continue }
+  if ($svc.Status -eq 'Stopped' -and "$($svc.StartType)" -eq 'Disabled') { "already stopped + disabled  $($s.Name)"; continue }
   if ($DryRun) { "would stop + disable service  $($s.Name) (now $($svc.Status))"; continue }
   try {
     if ($svc.Status -ne 'Stopped') { Stop-Service -Name $s.Name -Force }

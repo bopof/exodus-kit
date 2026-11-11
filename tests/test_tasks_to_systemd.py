@@ -186,13 +186,16 @@ echo "$@" >> "$FAKE_ETC/calls.log"
         stubs = (
             "function Get-ScheduledTask { param($TaskPath, $TaskName, $ErrorAction) "
             "[pscustomobject]@{ TaskPath = $TaskPath; TaskName = $TaskName; "
-            "State = $(if ($TaskName -in 'Nightly Backup', 'At Logon') { 'Running' } else { 'Ready' }) } }; "
+            "State = $(if ($TaskName -in 'Nightly Backup', 'At Logon') { 'Running' } "
+            "elseif ($TaskName -eq 'Disabled Task') { 'Disabled' } else { 'Ready' }) } }; "
             "function Get-Service { param($Name, $ErrorAction) [pscustomobject]@{ Name = $Name; Status = 'Running' } }; ")
         p = subprocess.run(["pwsh", "-NoProfile", "-NonInteractive", "-c",
                             stubs + f"& '{self.out}/cutover-windows.ps1' -DryRun; exit $LASTEXITCODE"],
                            capture_output=True, text=True)
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertIn("would stop + disable service  MyDashboard", p.stdout)
+        self.assertIn("already disabled  \\Disabled Task", p.stdout)
+        self.assertNotIn("would disable task  \\Disabled Task", p.stdout)
         self.assertIn("STILL RUNNING: \\Nightly Backup", p.stdout + p.stderr)
         self.assertNotIn("At Logon", (p.stdout + p.stderr).split("STILL RUNNING")[1])   # agent: not waited for
         self.assertIn("not waited for (logon/boot/event task, the shutdown ends it): \\At Logon", p.stdout)
