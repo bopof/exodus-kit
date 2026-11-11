@@ -57,7 +57,7 @@ pick_device() {
   [[ -n "$DEV" ]] && { cryptsetup isLuks "$DEV" || die "$DEV is not a LUKS device"; return; }
   # The LUKS device that holds / : walk up from the root filesystem.
   local src; src=$(findmnt -no SOURCE /)
-  DEV=$(lsblk -spno NAME,FSTYPE "$src" 2>/dev/null | awk '$2=="crypto_LUKS"{print $1; exit}')
+  DEV=$(lsblk -slpno NAME,FSTYPE "$src" 2>/dev/null | awk '$2=="crypto_LUKS"{print $1; exit}')
   [[ -n "$DEV" ]] || die "could not find the LUKS device under / (pass --device /dev/...)"
 }
 has_tpm_slot() {
