@@ -219,6 +219,9 @@ class Units(unittest.TestCase):
         self.assertFalse(extra.wanted("\\ASUS\\AcPowerNotification"))        # defaults kept
         self.assertTrue(t2s.Config(exclude=[]).wanted("\\ASUS\\AcPowerNotification"))
         self.assertEqual(t2s.Config(include=["\\A*"]).excluded_by("\\B"), "(not in include)")
+        keep = t2s.Config(keep=["service:steam client service"], exclude_extra=["service:Steam*"])
+        self.assertTrue(keep.wanted("service:Steam Client Service"))           # keep wins over both lists
+        self.assertFalse(keep.wanted("service:gupdate"))                       # other defaults kept
 
     def test_iso_duration(self):
         self.assertEqual(t2s.iso_duration_seconds("PT1H30M"), 5400)

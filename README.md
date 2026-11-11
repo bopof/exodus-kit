@@ -42,7 +42,7 @@ sudo linux/tpm-unlock.sh --check                                    # optional, 
 
 The units generated in `out/` are **never enabled by the generator**. You install them disabled, test each one by hand, and enable them all at cutover with the generated `out/cutover-windows.ps1` and `out/cutover-linux.sh` (both have a dry-run mode; `rollback-*` undo them). The playbook explains why.
 
-Vendor housekeeping (browser and driver updaters, OEM utilities, telemetry helpers) is **left out by default**. REPORT.md lists everything left out and the pattern that matched it. Add your own patterns with `exclude_extra`, or set `exclude` to replace the defaults.
+Vendor housekeeping (browser and driver updaters, OEM utilities, telemetry helpers) is **left out by default**. REPORT.md lists everything left out and the pattern that matched it. Everyone ports different things, so it's all config: `exclude_extra` leaves out more, `keep` ports something the defaults leave out, and `exclude` replaces the defaults entirely. Patterns use `*`, ignore case, match tasks on their full path (`\\Vendor\\Task`) and services as `service:<name>`.
 
 ## Tested on
 

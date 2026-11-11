@@ -42,7 +42,8 @@ WELL_KNOWN_SIDS = {
 }
 # Default excludes: OS and vendor housekeeping (updaters, telemetry, hardware utilities) that has no
 # place on Linux. Matched case-insensitively. Tasks are matched on their full path, services as
-# "service:<name>". `exclude` in the config replaces this list; `exclude_extra` adds to it.
+# "service:<name>". `exclude` in the config replaces this list, `exclude_extra` adds to it, and
+# `keep` patterns win over both (port one item without giving up the rest of the defaults).
 DEFAULT_EXCLUDES = [
     # tasks
     "\\Microsoft\\*", "\\MicrosoftEdge*", "\\OneDrive*", "\\SoftLanding\\*", "\\Xbox*",
@@ -124,6 +125,7 @@ class Config:
     include: list = field(default_factory=list)
     exclude: list = field(default_factory=lambda: list(DEFAULT_EXCLUDES))
     exclude_extra: list = field(default_factory=list)
+    keep: list = field(default_factory=list)
     exec_map: dict = field(default_factory=dict)
     after: list = field(default_factory=lambda: ["network-online.target"])
     trusted_interface: str = "<trusted-iface>"
@@ -166,6 +168,8 @@ class Config:
     def excluded_by(self, full_path: str) -> str | None:
         """The pattern that leaves this task/service out, or None. Case-insensitive, like Windows."""
         low = full_path.lower()
+        if any(fnmatch.fnmatchcase(low, p.lower()) for p in self.keep):
+            return None
         for pat in list(self.exclude) + list(self.exclude_extra):
             if fnmatch.fnmatchcase(low, pat.lower()):
                 return pat
@@ -509,8 +513,8 @@ def report(cfg: Config, inv: dict, results: list[Result], out: Path, errors: lis
                  f"{notes.replace('|', '/')} |")
     if excluded:
         L += ["", f"## Left out ({len(excluded)})", "",
-              "Matched an exclude pattern (vendor updaters and utilities by default). To port one, set "
-              "`exclude` in the config (it replaces the defaults) or remove the pattern there.", "",
+              "Matched an exclude pattern (vendor updaters and utilities by default). To port one anyway, "
+              "add its name to `keep` in the config. `exclude_extra` leaves out more.", "",
               "| Windows | Pattern |", "|---|---|"]
         L += [f"| {n.replace('|', '/')} | `{p}` |" for n, p in excluded]
     fw = inv.get("firewall") or []
