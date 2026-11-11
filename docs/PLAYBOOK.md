@@ -20,7 +20,7 @@ Run `windows/preflight.ps1` from an admin PowerShell. It changes nothing and rep
 
 Then:
 
-1. **Export the inventory:** `windows/export-windows.ps1 -OutFile <somewhere on C:>`. It writes the scheduled tasks (full XML), third-party services, installed apps and inbound firewall rules. Arguments that look like secrets are redacted. **Read the file anyway** (see PITFALLS: plaintext passwords in old scripts).
+1. **Export the inventory:** `windows/export-windows.ps1` (from an admin PowerShell; it writes to `%USERPROFILE%\exodus-kit\` unless you pass `-OutFile`). It writes the scheduled tasks (full XML), third-party services, installed apps and inbound firewall rules. Arguments that look like secrets are redacted. **Read the file anyway** (see PITFALLS: plaintext passwords in old scripts).
 2. **Download the ISO and check its hash** against the distribution's `SHA256SUMS` (`Get-FileHash -Algorithm SHA256`). Write it to a USB stick with Rufus (GPT/UEFI) or balenaEtcher.
 3. **Prepare the target disk.** If the Linux disk has old partitions, clear it from Windows. Select it by **model name**, never by number:
    ```powershell

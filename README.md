@@ -24,8 +24,10 @@ It started from a real migration (a Windows 11 desktop that also acted as a home
 ```powershell
 # On Windows, in an admin PowerShell, from the repo folder
 powershell -ExecutionPolicy Bypass -File windows\preflight.ps1
-powershell -ExecutionPolicy Bypass -File windows\export-windows.ps1 -OutFile $HOME\Desktop\exodus-inventory.json
+powershell -ExecutionPolicy Bypass -File windows\export-windows.ps1   # writes %USERPROFILE%\exodus-kit\exodus-inventory.json
 ```
+
+The export goes to `%USERPROFILE%\exodus-kit` by default, not the Desktop, because OneDrive often syncs the Desktop. `preflight.ps1` exits with code 1 on a FAIL; without admin it says its verdict is incomplete.
 
 Then install Linux (see the playbook) and, on Linux:
 
@@ -33,7 +35,7 @@ Then install Linux (see the playbook) and, on Linux:
 linux/copy-from-windows.sh --win-user <WindowsUser> --dry-run       # see what would be copied
 linux/copy-from-windows.sh --win-user <WindowsUser>                 # copy for real (Windows stays read-only)
 cp examples/exodus.config.example.json exodus.config.json           # then edit: paths, users, commands
-python3 linux/tasks-to-systemd.py ~/exodus-inventory.json -c exodus.config.json -o out/
+python3 linux/tasks-to-systemd.py /path/to/exodus-inventory.json -c exodus.config.json -o out/
 less out/REPORT.md                                                  # read this before installing anything
 sudo linux/tpm-unlock.sh --check                                    # optional, needed for unattended reboots
 ```
@@ -55,6 +57,7 @@ The units generated in `out/` are **never enabled by the generator**. You instal
 
 ```bash
 python3 -m unittest discover -s tests      # converter tests: sample inventory -> units, validated with systemd-analyze
+pwsh -c 'Invoke-Pester tests'              # redaction tests for export-windows.ps1 (Pester 5+; pwsh 7 or PS 5.1)
 scripts/leak-check.sh                      # before every push; add your own identifiers to .leakcheck-patterns
 ```
 
