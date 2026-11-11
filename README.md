@@ -16,6 +16,9 @@ It started from a real migration (a Windows 11 desktop that also acted as a home
 | [`windows/export-windows.ps1`](windows/export-windows.ps1) | Exports your scheduled tasks (full XML), third-party services (including NSSM wrappers), installed apps and inbound firewall rules to one JSON file. Secrets are redacted |
 | [`linux/tasks-to-systemd.py`](linux/tasks-to-systemd.py) | Turns that export into systemd `.service` and `.timer` files, a report of anything it couldn't translate exactly, and cutover/rollback scripts for both sides, for exactly those units |
 | [`linux/copy-from-windows.sh`](linux/copy-from-windows.sh) | Mounts the Windows partition **read-only** and copies your profile folders, skipping what can be rebuilt. Can re-sync at cutover |
+| [`linux/cifs-automount.sh`](linux/cifs-automount.sh) | Mounts an SMB share on first access, never blocking boot, with the password in a root-only file; can make a service wait for it. Prints everything first, writes only with `--apply` |
+| [`linux/run-monitored.sh`](linux/run-monitored.sh) | Runs a job and pushes the result to Uptime Kuma, healthchecks.io or any ping URL. The converter wraps jobs mapped with `"heartbeat": true` |
+| [`linux/jellyfin-carry-userdata.py`](linux/jellyfin-carry-userdata.py) | Carries Jellyfin watch state (played, resume position, favorites) from the old server to the new one by matching file paths. Dry-run by default; backs up first |
 | [`linux/tpm-unlock.sh`](linux/tpm-unlock.sh) | Unlocks LUKS from the TPM so the machine can reboot without anyone typing a passphrase. Works with dracut and with initramfs-tools |
 | [`scripts/leak-check.sh`](scripts/leak-check.sh) | Scans for secrets and personal identifiers before you share an export or push a fork |
 
@@ -51,6 +54,7 @@ Vendor housekeeping (browser and driver updaters, OEM utilities, telemetry helpe
 | Ubuntu 26.04 LTS · NVIDIA (signed prebuilt driver) · Secure Boot on · dracut · LUKS+LVM | ✅ used for a real migration |
 | Ubuntu 24.04 / 25.x · initramfs-tools + clevis path | ⚠️ written, not yet verified end-to-end |
 | Fedora, Linux Mint, Debian, Arch, AMD GPUs | ❓ untested. The method applies; package names and the initramfs step differ. Reports welcome |
+| `jellyfin-carry-userdata.py`, Jellyfin 10.11+ database (EF Core `jellyfin.db`) | ✅ checked against a real Windows → Linux move: identical result to the hand-made import |
 | `windows/*.ps1` on Windows 11, PowerShell 5.1, elevated | ✅ run on a real machine (preflight, export, Pester 43/43); Windows 10 untested, no CI |
 
 `copy-from-windows.sh --root DIR` works from an already-mounted C: or a backup copy, without needing sudo.
@@ -58,7 +62,7 @@ Vendor housekeeping (browser and driver updaters, OEM utilities, telemetry helpe
 ## Development
 
 ```bash
-python3 -m unittest discover -s tests      # converter tests: sample inventory -> units, validated with systemd-analyze
+python3 -m unittest discover -s tests      # converter, heartbeat, cifs-automount and Jellyfin tests
 pwsh -c 'Invoke-Pester tests'              # redaction tests for export-windows.ps1 (Pester 5+; pwsh 7 or PS 5.1)
 scripts/leak-check.sh                      # before every push; add your own identifiers to .leakcheck-patterns
 ```

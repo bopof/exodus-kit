@@ -159,7 +159,7 @@ echo "$@" >> "$FAKE_ETC/calls.log"
     def test_linux_refuses_when_not_installed(self):
         p = self.run_sh("cutover-linux.sh", Path(self.tmp.name), "--dry-run")
         self.assertEqual(p.returncode, 1)
-        self.assertIn("Not installed", p.stderr)
+        self.assertIn("not installed in systemd", p.stderr)
 
     def test_linux_refuses_unported(self):
         p = self.run_sh("cutover-linux.sh", self.install("etc-todo"), "--dry-run")

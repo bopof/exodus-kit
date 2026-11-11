@@ -16,10 +16,14 @@
   "after": ["network-online.target"],
   "trusted_interface": "tailscale0",
   "persistent": true,
+  "_heartbeat": "Jobs with \"heartbeat\": true run through heartbeat_wrapper (install linux/run-monitored.sh there). Their push URL goes in <heartbeat_dir>/<unit>.url, root-only. A string instead of true is the URL file's path.",
+  "heartbeat_wrapper": "/usr/local/bin/exodus-run-monitored",
+  "heartbeat_dir": "/etc/exo/heartbeat",
   "exec_map": {
     "\\Nightly Backup": {
       "exec": "/usr/bin/rsync -a --delete /home/alice/Documents/ /mnt/nas/backup/Documents/",
-      "requires_mounts_for": ["/mnt/nas/backup"]
+      "requires_mounts_for": ["/mnt/nas/backup"],
+      "heartbeat": true
     },
     "\\MyApp\\Daily Collect": {
       "exec": "/home/alice/projects/myapp/.venv/bin/python collect.py --delay 120",

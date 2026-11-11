@@ -23,6 +23,7 @@ import csv
 import fnmatch
 import json
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -130,6 +131,8 @@ class Config:
     after: list = field(default_factory=lambda: ["network-online.target"])
     trusted_interface: str = "<trusted-iface>"
     persistent: bool = True
+    heartbeat_wrapper: str = "/usr/local/bin/exodus-run-monitored"   # linux/run-monitored.sh, installed
+    heartbeat_dir: str = ""                                          # default /etc/<prefix>/heartbeat
 
     @classmethod
     def load(cls, path: str | None) -> "Config":
@@ -333,6 +336,19 @@ def exec_lines(cfg: Config, mapping: dict | None, win_cmds: list[str], unit: str
     return [f"ExecStart=/bin/sh -c 'echo \"{msg}\" >&2; exit 1'"], False
 
 
+def heartbeat(cfg: Config, mapping: dict | None, ex: list[str], ported: bool, unit: str,
+              sched: "Schedule") -> tuple[str, list[str]]:
+    """exec_map "heartbeat": true (or a URL file path) -> (URL file, [LoadCredential value])."""
+    hb = (mapping or {}).get("heartbeat")
+    if not hb or not ported:
+        return "", []
+    if len(ex) != 1:
+        sched.notes.append("heartbeat needs a single exec (wrap your commands in one script): not added")
+        return "", []
+    f = hb if isinstance(hb, str) else f"{cfg.heartbeat_dir or '/etc/' + cfg.prefix + '/heartbeat'}/{unit}.url"
+    return f, [f"heartbeat-url:{f}"]
+
+
 def common_unit(cfg: Config, mapping: dict | None) -> list[str]:
     after = list(cfg.after) + list((mapping or {}).get("after", []))
     lines = [f"Wants={' '.join(a for a in after if a.endswith('.target'))}" if any(a.endswith(".target") for a in after) else None,
@@ -361,6 +377,7 @@ class Result:
     disabled_on_windows: bool = False
     start_type: str = ""          # services: Windows start type, restored at rollback
     has_timer: bool = False       # tasks: a .timer was written (else nothing to enable)
+    heartbeat: str = ""           # tasks: root-only file holding the heartbeat push URL
     scheduled: bool = False       # tasks: time-triggered job (cutover waits for it); else an agent
 
 
@@ -397,12 +414,15 @@ def convert_task(cfg: Config, task: dict, out: Path) -> Result | None:
     enabled = text(root, "t:Settings/t:Enabled", "true").lower() != "false"
 
     ex, ported = exec_lines(cfg, mapping, win_cmds, unit)
+    hb_file, hb_cred = heartbeat(cfg, mapping, ex, ported, unit, sched)
+    if hb_file:
+        ex = [f"ExecStart={cfg.heartbeat_wrapper} {unit} -- {ex[0][len('ExecStart='):]}"]
     svc = [UNIT_HEADER, "[Unit]", f"Description={sd_escape('Job: ' + task['name'])} (ported from Task Scheduler)"]
     svc += common_unit(cfg, mapping)
     svc += ["", "[Service]", "Type=oneshot", f"User={user}"]
     svc += [f"WorkingDirectory={wd}"] if wd and not re.match(r"^[A-Za-z]:", wd) else []
     svc += ["Environment=PYTHONUNBUFFERED=1"] + service_env(mapping)
-    svc += [f"LoadCredential={c}" for c in (mapping or {}).get("credentials", [])]
+    svc += [f"LoadCredential={c}" for c in (mapping or {}).get("credentials", []) + hb_cred]
     svc += ex + [f"TimeoutStartSec={timeout}", "",
                  "# Windows action(s), for reference:"] + [f"#   {sd_escape(c)}" for c in win_cmds]
     (out / f"{unit}.service").write_text("\n".join(svc) + "\n", encoding="utf-8")
@@ -421,7 +441,7 @@ def convert_task(cfg: Config, task: dict, out: Path) -> Result | None:
     return Result("task", full, unit, ported, sched.on_calendar + (
         [f"OnBootSec={human_seconds(sched.on_boot_sec)}"] if sched.on_boot_sec else []) + (
         [f"OnUnitActiveSec={human_seconds(sched.on_unit_active_sec)}"] if sched.on_unit_active_sec else []),
-        sched.notes, sched.skipped, win_cmds, not enabled,
+        sched.notes, sched.skipped, win_cmds, not enabled, heartbeat=hb_file,
         has_timer=bool(sched.on_calendar or sched.on_boot_sec or sched.on_unit_active_sec),
         scheduled=bool(sched.on_calendar or sched.on_unit_active_sec))
 
@@ -497,6 +517,15 @@ def report(cfg: Config, inv: dict, results: list[Result], out: Path, errors: lis
           "| 4. enable the timers and services | Linux | `sudo ./cutover-linux.sh [--dry-run]` |",
           "| rollback | Linux | `sudo ./rollback-linux.sh [--dry-run]` |",
           "| rollback | Windows (admin) | `rollback-windows.ps1 [-DryRun]` |", ""]
+    hbs = [r for r in tasks if r.heartbeat]
+    if hbs:
+        L += ["## Heartbeats", "",
+              f"{len(hbs)} job(s) run through `{cfg.heartbeat_wrapper}` (install `linux/run-monitored.sh` there). "
+              "Each needs a root-only file holding its push URL (Uptime Kuma push, healthchecks.io, or a plain URL). "
+              "systemd refuses to start the job while the file is missing, and `cutover-linux.sh` checks for them:", "",
+              "```bash", f"sudo install -Dm755 linux/run-monitored.sh {cfg.heartbeat_wrapper}"]
+        L += [f"sudo install -Dm600 /dev/null {r.heartbeat} && sudoedit {r.heartbeat}" for r in hbs]
+        L += ["```", ""]
     nosched = [r for r in tasks if not r.has_timer]
     if nosched:
         L += [f"Not enabled by `cutover-linux.sh` (no timer could be generated, give them a trigger by hand): "
@@ -667,15 +696,21 @@ CUTOVER_SH = SH_HEAD + r"""# Cutover, step 4 (PLAYBOOK phase 6), on Linux: enabl
 ENABLE=(@@ENABLE@@)
 # Job services: started by their timer, checked here because they must be installed and ported too.
 JOBS=(@@JOBS@@)
+HEARTBEAT_WRAPPER=@@HBWRAP@@
+HEARTBEAT_FILES=(@@HBFILES@@)
 missing=(); todo=()
+if (( ${#HEARTBEAT_FILES[@]} )); then
+  [[ -x $HEARTBEAT_WRAPPER ]] || missing+=("$HEARTBEAT_WRAPPER (install linux/run-monitored.sh there)")
+  for f in "${HEARTBEAT_FILES[@]}"; do [[ -e $f ]] || missing+=("$f (heartbeat URL, see REPORT.md)"); done
+fi
 for u in "${ENABLE[@]}" "${JOBS[@]}"; do
   f=$(systemctl show -P FragmentPath "$u" 2>/dev/null || true)
-  if [[ -z $f ]]; then missing+=("$u"); continue; fi
+  if [[ -z $f ]]; then missing+=("$u (not installed in systemd)"); continue; fi
   [[ $u == *.service ]] && grep -q 'is not ported yet' "$f" && todo+=("$u")
 done
 if (( ${#missing[@]} )); then
-  echo "Not installed in systemd: ${missing[*]}" >&2
-  echo "Copy them to /etc/systemd/system/ and run systemctl daemon-reload first (see REPORT.md)." >&2
+  printf 'Missing: %s\n' "${missing[@]}" >&2
+  echo "Units: copy them to /etc/systemd/system/ and run systemctl daemon-reload. See REPORT.md." >&2
   exit 1
 fi
 if (( ${#todo[@]} )); then
@@ -726,7 +761,10 @@ def write_cutover(cfg: Config, results: list[Result], out: Path) -> None:
     every = [f"{r.unit}.timer" for r in tasks if r.has_timer] + [f"{r.unit}.service" for r in results]
     for name, body in (
             ("cutover-linux.sh", CUTOVER_SH.replace("@@ENABLE@@", " ".join(enable))
-             .replace("@@JOBS@@", " ".join(jobs)).replace("@@TIMERGLOB@@", f"'{cfg.prefix}-*'")),
+             .replace("@@JOBS@@", " ".join(jobs))
+             .replace("@@HBWRAP@@", shlex.quote(cfg.heartbeat_wrapper))
+             .replace("@@HBFILES@@", " ".join(shlex.quote(r.heartbeat) for r in tasks
+                                               if r.heartbeat and r.has_timer and not r.disabled_on_windows)).replace("@@TIMERGLOB@@", f"'{cfg.prefix}-*'")),
             ("rollback-linux.sh", ROLLBACK_SH.replace("@@UNITS@@", " ".join(every)))):
         f = out / name
         f.write_text(body, encoding="utf-8")

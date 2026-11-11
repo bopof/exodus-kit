@@ -86,6 +86,7 @@ cp examples/exodus.config.example.json exodus.config.json   # edit it
 python3 linux/tasks-to-systemd.py exodus-inventory.json -c exodus.config.json -o out/
 ```
 - `exec_map` tells the converter which Linux command replaces each Windows action (`.bat`/`.ps1` launchers can't run as-is). Anything you don't map becomes a unit that **fails loudly** with "not ported yet". It never runs the wrong thing quietly.
+- Was a job monitored on Windows (a wrapper that pushed to Uptime Kuma or healthchecks.io after each run)? Add `"heartbeat": true` to its `exec_map` entry. The unit then runs through `linux/run-monitored.sh`, which pushes up/down plus the run time, and reads the push URL from a root-only file through `LoadCredential=`. REPORT.md lists the files to create, and `cutover-linux.sh` refuses to run while one is missing.
 - Read `out/REPORT.md`. Every trigger that was approximated or skipped is listed there (logon triggers, event triggers, repeating every N days…).
 - Install the units **disabled**:
   ```bash
@@ -95,11 +96,28 @@ python3 linux/tasks-to-systemd.py exodus-inventory.json -c exodus.config.json -o
   ```
 
 ### Network shares
-For SMB shares, use **systemd automounts** that wait for the network (or your VPN) and never block boot, with credentials in a root-only file:
+For SMB shares, use **systemd automounts** that mount on first access and never block boot, with the password in a root-only file. They replace `net use` at logon and the "wait for the NAS, then start the app" scripts. `linux/cifs-automount.sh` writes all of it, and shows it first:
+```bash
+linux/cifs-automount.sh --server nas.lan --share Media --mount /mnt/nas/media \
+    --after tailscaled.service --for jellyfin.service                # dry run: prints the fstab line and drop-in
+sudo linux/cifs-automount.sh ... --apply                             # asks for the SMB user + password once
 ```
-//nas/share  /mnt/nas/share  cifs  credentials=/etc/<name>/nas.cred,uid=<user>,gid=<group>,_netdev,nofail,x-systemd.automount,x-systemd.idle-timeout=600  0 0
+The fstab line it writes:
 ```
-If a service needs the share, give it `After=` and `RequiresMountsFor=` on that path.
+//nas.lan/Media /mnt/nas/media cifs credentials=/etc/exodus-kit/cifs/nas.lan.cred,uid=1000,gid=1000,file_mode=0644,dir_mode=0755,iocharset=utf8,_netdev,nofail,x-systemd.automount,x-systemd.idle-timeout=0,x-systemd.mount-timeout=60,x-systemd.after=tailscaled.service 0 0
+```
+`--for <service>` gives that service `Wants=` + `After=` on the mount, so it starts once the share is there and still starts if the NAS is down. For a job that must not run without the share, use `requires_mounts_for` in its `exec_map` entry instead. Use a NAS account that can reach only the shares this machine needs, not your admin account.
+
+### Media server watch history
+Reinstall the media server and let it scan the libraries from their new paths. For Jellyfin, carry the watch state over afterwards:
+```bash
+sudo systemctl stop jellyfin
+python3 linux/jellyfin-carry-userdata.py /mnt/windows/ProgramData/Jellyfin/Server/data/jellyfin.db \
+    /var/lib/jellyfin/data/jellyfin.db --map '\\nas\Movies=/mnt/nas/movies' --map '\\nas\TV=/mnt/nas/tv'
+# read the counts, then run it again with sudo and --apply (it backs up the new database first)
+sudo systemctl start jellyfin
+```
+It matches items by path and users by name. Create the users on the new server first. Only watch state and favorites move; passwords, devices and library options don't. Clients log in again once.
 
 ### Firewall
 Default to `ufw default deny incoming`. Open each app port **only on the interface you trust** (for example your VPN or tailnet interface), so you're not relying on the app's own bind address.

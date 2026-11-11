@@ -77,6 +77,9 @@ A Windows task missed during downtime started as soon as Windows booted, and was
 **Windows "run whether user is logged on or not" with no equivalent.**
 That's a system service in systemd terms (`User=` in a system unit). "Run at logon" becomes a `systemd --user` unit or an XDG autostart entry instead. The converter flags these.
 
+**A job stopped running and nobody noticed.**
+On Windows a wrapper often pushed a heartbeat to a monitor (Uptime Kuma, healthchecks.io) after each run. A plain port of the command loses that. Map the job with `"heartbeat": true` and the converter runs it through `linux/run-monitored.sh`, with the push URL in a root-only credential file.
+
 **Plaintext passwords in old Windows scripts.**
 Launchers that map network drives (`net use … /user:x password`) or start apps often have credentials baked in. The export redacts what it can recognize, but read through your `.ps1`/`.bat` files too. Rotate those passwords after the migration and keep the new ones in root-only credential files.
 
@@ -86,7 +89,10 @@ Launchers that map network drives (`net use … /user:x password`) or start apps
 Some Flatpak browser builds ship without H.264. Use a browser from the distribution or a Snap for media web UIs, or install the codec extension.
 
 **The media server's database doesn't move between OSes.**
-Media servers store absolute Windows paths (`\\server\share\…`, `D:\Movies`). Do a fresh install with new libraries. If you want the watch history, merge it afterwards by rewriting paths in a copy of the database while the server is stopped. Library IDs often match when the library names and paths line up.
+Media servers store absolute Windows paths (`\\server\share\…`, `D:\Movies`). Do a fresh install with new libraries. For Jellyfin, `linux/jellyfin-carry-userdata.py` then carries played state, resume positions, play counts and favorites across by matching paths. Library IDs often match when the library names and paths line up.
+
+**Opening a database "read-only" still writes next to it.**
+SQLite updates the `-shm` index file beside a WAL-mode database even with `mode=ro`, as long as the folder is writable. That's the case for C: when it's mounted read-write, and it breaks "Windows is never written to". Copy the `.db` (and any `-wal`) somewhere else first and open the copy. `jellyfin-carry-userdata.py` does this for you.
 
 **The media server tries to write to your NAS.**
 On Linux it often runs as its own user. Turn off "save artwork/NFO into media folders" if the share is meant to be read-only for it.
