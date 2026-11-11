@@ -125,13 +125,18 @@ $rst = @(Get-CimInstance Win32_SystemDriver -ErrorAction SilentlyContinue |
   Where-Object { $_.Name -match '^iaStor' -and $_.State -eq 'Running' })
 if ($rst) {
   Add-Result 'WARN' 'Storage mode' "Intel RST/VMD driver active ($(($rst.Name) -join ', '))" `
-    'Linux installers often do not see NVMe drives in this mode. Switch the firmware to AHCI / disable VMD, booting Windows once in Safe Mode first so it loads the AHCI driver'
+    'Linux has a vmd driver and a recent installer may work as is (Ubuntu 26.04 did on the reference machine); older installers may not see the drives or may refuse. If the installer lists no disk or complains about RST, switch the firmware to AHCI / disable VMD, booting Windows once in Safe Mode first so it loads the AHCI driver'
 } else { Add-Result 'PASS' 'Storage mode' 'no Intel RST/VMD driver running' }
 
 # --- Disks -------------------------------------------------------------------------------
 $sysDisk = (Get-Partition -DriveLetter ($env:SystemDrive.TrimEnd(':')) -ErrorAction SilentlyContinue).DiskNumber
 foreach ($d in Get-Disk) {
-  $role = if ($d.Number -eq $sysDisk) { 'WINDOWS - do not touch' } else { 'candidate for Linux?' }
+  # GPT types: 0fc63daf... = Linux filesystem (also used for LUKS), 0657fd6d... = Linux swap, e6d6d379... = LVM.
+  $linuxParts = @(Get-Partition -DiskNumber $d.Number -ErrorAction SilentlyContinue |
+    Where-Object { $_.GptType -match '0fc63daf-8483-4772-8e79-3d69d8477de4|0657fd6d-a4ab-43c4-84e5-0933c84b4f4f|e6d6d379-f507-44c2-a23c-238f2a3df928' })
+  $role = if ($d.Number -eq $sysDisk) { 'WINDOWS - do not touch' }
+          elseif ($linuxParts.Count) { "already has $($linuxParts.Count) Linux partition(s)" }
+          else { 'candidate for Linux?' }
   Add-Result 'INFO' "Disk $($d.Number)" ("{0} | {1:N0} GB | {2} | {3}" -f $d.FriendlyName, ($d.Size / 1GB), $d.PartitionStyle, $role)
 }
 $c = Get-PSDrive -Name ($sys.TrimEnd(':'))

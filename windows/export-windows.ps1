@@ -145,7 +145,8 @@ foreach ($s in Get-CimInstance Win32_Service) {
         application = "$($pp.Application)"
         parameters  = Protect-Text "$($pp.AppParameters)"
         directory   = "$($pp.AppDirectory)"
-        environment = @($pp.AppEnvironmentExtra | ForEach-Object { Protect-EnvEntry "$_" })
+        # Where-Object: with no AppEnvironmentExtra, $null would go through once and give [""].
+        environment = @($pp.AppEnvironmentExtra | Where-Object { $_ } | ForEach-Object { Protect-EnvEntry "$_" })
       }
     }
   }
