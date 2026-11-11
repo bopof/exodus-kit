@@ -26,6 +26,9 @@ Debian/Ubuntu's initramfs-tools ignores that option. Use clevis instead (`clevis
 **The passphrase prompt comes back months later.**
 PCR 7 changed: a firmware update, Microsoft's new Secure Boot certificates installed through Windows Update, a dbx update or a shim update. This is expected. Type the passphrase, then `tpm-unlock.sh --reseal`.
 
+**`/dev/nvme0n1` and `/dev/nvme1n1` swap places between boots.**
+NVMe numbering follows probe order, not slots. A command in your notes such as `cryptenroll … /dev/nvme0n1p3` can end up pointing at the *Windows* disk weeks later. In anything you save, use `/dev/disk/by-uuid/<UUID>` (`lsblk -dno UUID <partition>`, the same UUID as in `/etc/crypttab`). `tpm-unlock.sh` finds the device from `/` each time for this reason.
+
 **An unattended reboot lands in the wrong OS.**
 With two systems and one firmware boot order, a scheduled reboot on one side can come up in the other. To reboot into Linux once without changing the default, use `efibootmgr --bootnext <num>`.
 
