@@ -1,0 +1,178 @@
+{
+ "schema": 1,
+ "exportedAt": "2026-01-10T12:00:00",
+ "os": "Microsoft Windows 11 Pro (sample)",
+ "scheduledTasks": [
+  {
+   "name": "Nightly Backup",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><StartBoundary>2026-01-05T18:30:00</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\Scripts\\backup.bat</Command><WorkingDirectory>C:\\Users\\Alice\\Scripts</WorkingDirectory></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "Daily Collect",
+   "path": "\\MyApp\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><RandomDelay>PT2M</RandomDelay><StartBoundary>2026-01-05T09:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\Users\\Alice\\projects\\myapp\\run_collect.bat</Command><Arguments>120</Arguments><WorkingDirectory>C:\\Users\\Alice\\projects\\myapp</WorkingDirectory></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "Weekly Report",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><StartBoundary>2026-01-05T06:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByWeek><WeeksInterval>1</WeeksInterval><DaysOfWeek><Monday/><Friday/></DaysOfWeek></ScheduleByWeek></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>powershell.exe</Command><Arguments>-File C:\\Scripts\\report.ps1</Arguments></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "Fortnightly",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><StartBoundary>2026-01-05T02:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByWeek><WeeksInterval>2</WeeksInterval><DaysOfWeek><Sunday/></DaysOfWeek></ScheduleByWeek></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>cmd.exe</Command><Arguments>/c echo hi</Arguments></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "Monthly Audit",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><StartBoundary>2026-01-05T09:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByMonth><DaysOfMonth><Day>1</Day><Day>15</Day></DaysOfMonth><Months><January/><February/><March/><April/><May/><June/><July/><August/><September/><October/><November/><December/></Months></ScheduleByMonth></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\audit.exe</Command></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "Month End",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><StartBoundary>2026-01-05T22:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByMonth><DaysOfMonth><Day>Last</Day></DaysOfMonth><Months><March/><June/><September/><December/></Months></ScheduleByMonth></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\monthend.exe</Command></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "First Monday",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><StartBoundary>2026-01-05T07:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByMonthDayOfWeek><Weeks><Week>1</Week></Weeks><DaysOfWeek><Monday/></DaysOfWeek><Months><January/><February/><March/><April/><May/><June/><July/><August/><September/><October/><November/><December/></Months></ScheduleByMonthDayOfWeek></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\first.exe</Command></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "Last Friday",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><StartBoundary>2026-01-05T17:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByMonthDayOfWeek><Weeks><Week>Last</Week></Weeks><DaysOfWeek><Friday/></DaysOfWeek></ScheduleByMonthDayOfWeek></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\last.exe</Command></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "Every 15 Minutes",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><Repetition><Interval>PT15M</Interval></Repetition><StartBoundary>2026-01-05T00:05:00</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>S-1-5-18</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\poll.exe</Command></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "Work Hours Hourly",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><Repetition><Interval>PT1H</Interval><Duration>PT10H</Duration></Repetition><StartBoundary>2026-01-05T08:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\hourly.exe</Command></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "Every 90 Minutes",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><Repetition><Interval>PT90M</Interval></Repetition><StartBoundary>2026-01-05T00:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\odd.exe</Command></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "Every 3 Days",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><StartBoundary>2026-01-05T04:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>3</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\three.exe</Command></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "At Boot",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><BootTrigger><Enabled>true</Enabled><Delay>PT2M</Delay></BootTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>S-1-5-18</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\boot.exe</Command></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "At Logon",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><LogonTrigger><Enabled>true</Enabled></LogonTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\tray.exe</Command></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "On Event",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><EventTrigger><Enabled>true</Enabled><Subscription>&lt;QueryList/&gt;</Subscription></EventTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\event.exe</Command></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "Disabled Task",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><StartBoundary>2026-01-05T07:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit><Enabled>false</Enabled></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\x.exe</Command></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "Unlimited",
+   "path": "\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><StartBoundary>2026-01-05T03:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT0S</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\long.exe</Command></Exec></Actions>\n</Task>"
+  },
+  {
+   "name": "ExcludedByConfig",
+   "path": "\\Microsoft\\Windows\\",
+   "state": "Ready",
+   "xml": "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n  <Triggers><CalendarTrigger><StartBoundary>2026-01-05T07:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers>\n  <Principals><Principal id=\"Author\"><UserId>DESKTOP-EXAMPLE\\alice</UserId><LogonType>Password</LogonType></Principal></Principals>\n  <Settings><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT4H</ExecutionTimeLimit></Settings>\n  <Actions Context=\"Author\"><Exec><Command>C:\\x.exe</Command></Exec></Actions>\n</Task>"
+  }
+ ],
+ "services": [
+  {
+   "name": "MyDashboard",
+   "displayName": "My Dashboard",
+   "startType": "Automatic",
+   "state": "Running",
+   "binaryPath": "C:\\Tools\\nssm.exe",
+   "account": "LocalSystem",
+   "nssm": {
+    "application": "C:\\Users\\Alice\\projects\\myapp\\.venv\\Scripts\\python.exe",
+    "parameters": "-m streamlit run dashboard.py",
+    "directory": "C:\\Users\\Alice\\projects\\myapp"
+   }
+  },
+  {
+   "name": "SomeVendorAgent",
+   "displayName": "Vendor Agent",
+   "startType": "Automatic",
+   "state": "Running",
+   "binaryPath": "\"C:\\Program Files\\Vendor\\agent.exe\"",
+   "account": "LocalSystem",
+   "nssm": null
+  },
+  {
+   "name": "ManualThing",
+   "displayName": "Manual",
+   "startType": "Manual",
+   "state": "Stopped",
+   "binaryPath": "C:\\m.exe",
+   "account": "LocalSystem",
+   "nssm": null
+  }
+ ],
+ "apps": [
+  {
+   "name": "VLC media player",
+   "version": "3.0.21",
+   "publisher": "VideoLAN",
+   "source": "winget"
+  },
+  {
+   "name": "Obsidian",
+   "version": "1.9",
+   "publisher": "Obsidian",
+   "source": "registry"
+  }
+ ],
+ "firewall": [
+  {
+   "name": "My Dashboard",
+   "protocol": "TCP",
+   "localPort": "8501",
+   "remoteAddress": "100.64.0.0/10",
+   "program": "Any"
+  },
+  {
+   "name": "Media server",
+   "protocol": "TCP",
+   "localPort": "8096",
+   "remoteAddress": "Any",
+   "program": "Any"
+  }
+ ]
+}

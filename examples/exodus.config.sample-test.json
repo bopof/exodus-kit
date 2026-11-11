@@ -1,0 +1,13 @@
+{
+  "_comment": "Config used by the tests with examples/inventory.sample.json.",
+  "prefix": "exo",
+  "default_user": "alice",
+  "user_map": { "alice": "alice" },
+  "path_map": { "C:\\Users\\Alice": "/home/alice" },
+  "trusted_interface": "tailscale0",
+  "exec_map": {
+    "\\Nightly Backup": { "exec": "/usr/bin/rsync -a /home/alice/Documents/ /mnt/nas/backup/", "requires_mounts_for": ["/mnt/nas/backup"] },
+    "\\MyApp\\Daily Collect": { "exec": "/home/alice/projects/myapp/.venv/bin/python collect.py --delay 120", "credentials": ["api-token:/etc/myapp/api.token"] },
+    "service:MyDashboard": "/home/alice/projects/myapp/.venv/bin/python -m streamlit run dashboard.py"
+  }
+}

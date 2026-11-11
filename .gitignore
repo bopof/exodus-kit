@@ -1,0 +1,11 @@
+# your data -- never commit
+exodus.config.json
+*inventory*.json
+!examples/inventory.sample.json
+out/
+.leakcheck-patterns
+# python
+__pycache__/
+*.pyc
+# local change log written by a Claude Code hook
+CHANGES.md

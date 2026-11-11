@@ -1,0 +1,78 @@
+# exodus-kit
+
+Move a Windows machine to Linux **without a leap of faith**. You keep Windows as a working fallback until the very last step. If the switch goes wrong, rolling back means rebooting.
+
+Most Windows-to-Linux tools are for desktops. They copy your files and suggest replacement apps. exodus-kit covers what they skip, the work it takes when your PC also **runs things**: scheduled jobs, background services, encrypted disks that must boot unattended, and a cutover you can undo.
+
+It started from a real migration (a Windows 11 desktop that also acted as a home server, moved to Ubuntu). Everything machine-specific has been removed. What's left is the method, the pitfalls we hit, and the scripts.
+
+## What's inside
+
+| Path | What it is |
+|---|---|
+| [`docs/PLAYBOOK.md`](docs/PLAYBOOK.md) | The method in 7 phases: prepare on Windows, install, first boot, TPM unlock, port, test, cutover, plus the rollback |
+| [`docs/PITFALLS.md`](docs/PITFALLS.md) | Problems we actually hit, each with its fix |
+| [`windows/preflight.ps1`](windows/preflight.ps1) | Read-only checks before you install anything: Fast Startup, hibernation, BitLocker, clock, Secure Boot, disks, running tasks |
+| [`windows/export-windows.ps1`](windows/export-windows.ps1) | Exports your scheduled tasks (full XML), third-party services (including NSSM wrappers), installed apps and inbound firewall rules to one JSON file. Secrets are redacted |
+| [`linux/tasks-to-systemd.py`](linux/tasks-to-systemd.py) | Turns that export into systemd `.service` and `.timer` files, plus a report of anything it couldn't translate exactly |
+| [`linux/copy-from-windows.sh`](linux/copy-from-windows.sh) | Mounts the Windows partition **read-only** and copies your profile folders, skipping what can be rebuilt. Can re-sync at cutover |
+| [`linux/tpm-unlock.sh`](linux/tpm-unlock.sh) | Unlocks LUKS from the TPM so the machine can reboot without anyone typing a passphrase. Works with dracut and with initramfs-tools |
+| [`scripts/leak-check.sh`](scripts/leak-check.sh) | Scans for secrets and personal identifiers before you share an export or push a fork |
+
+## Quick start
+
+```powershell
+# On Windows, in an admin PowerShell, from the repo folder
+powershell -ExecutionPolicy Bypass -File windows\preflight.ps1
+powershell -ExecutionPolicy Bypass -File windows\export-windows.ps1 -OutFile $HOME\Desktop\exodus-inventory.json
+```
+
+Then install Linux (see the playbook) and, on Linux:
+
+```bash
+linux/copy-from-windows.sh --win-user <WindowsUser> --dry-run       # see what would be copied
+linux/copy-from-windows.sh --win-user <WindowsUser>                 # copy for real (Windows stays read-only)
+cp examples/exodus.config.example.json exodus.config.json           # then edit: paths, users, commands
+python3 linux/tasks-to-systemd.py ~/exodus-inventory.json -c exodus.config.json -o out/
+less out/REPORT.md                                                  # read this before installing anything
+sudo linux/tpm-unlock.sh --check                                    # optional, needed for unattended reboots
+```
+
+The units generated in `out/` are **never enabled by the generator**. You install them disabled, test each one by hand, and enable them all at cutover. The playbook explains why.
+
+## Tested on
+
+| | Status |
+|---|---|
+| Ubuntu 26.04 LTS · NVIDIA (signed prebuilt driver) · Secure Boot on · dracut · LUKS+LVM | ✅ used for a real migration |
+| Ubuntu 24.04 / 25.x · initramfs-tools + clevis path | ⚠️ written, not yet verified end-to-end |
+| Fedora, Linux Mint, Debian, Arch, AMD GPUs | ❓ untested. The method applies; package names and the initramfs step differ. Reports welcome |
+| `windows/*.ps1` on Windows 10/11, PowerShell 5.1 | ⚠️ written for it, not yet run in CI |
+
+`copy-from-windows.sh --root DIR` works from an already-mounted C: or a backup copy, without needing sudo.
+
+## Development
+
+```bash
+python3 -m unittest discover -s tests      # converter tests: sample inventory -> units, validated with systemd-analyze
+scripts/leak-check.sh                      # before every push; add your own identifiers to .leakcheck-patterns
+```
+
+## Principles
+
+1. **Windows is never written to.** It's mounted read-only, and its disk and boot loader are left alone. It stays your rollback until you decide otherwise.
+2. **Install everything disabled; enable it all at once.** Two machines running the same jobs against the same data (a trading bot, a publishing job, a database) is the worst outcome. A clean single cutover avoids it.
+3. **Re-sync at cutover.** Windows stays the source of truth until the last minute. Anything written on Linux during testing is overwritten.
+4. **Secrets never go in scripts.** Ask for them at install time and store them root-only (`/etc/<something>/*.cred`, mode 600). Pass them to services with `LoadCredential=`.
+5. **Be honest about approximations.** The converter reports every trigger it couldn't translate exactly instead of guessing quietly.
+
+## Related projects
+
+- [LucasFormiga/winuxdb](https://github.com/LucasFormiga/winuxdb): which Linux app replaces which Windows app
+- [dennishilk/linux-migration-companion](https://github.com/dennishilk/linux-migration-companion): a local advisor that assesses your setup
+- [AlexP11223/qBTConverter](https://github.com/AlexP11223/qBTConverter): rewrites Windows paths in qBittorrent `.fastresume` files
+- [KeyofBlueS/bt-keys-sync](https://github.com/KeyofBlueS/bt-keys-sync): keeps Bluetooth pairings working on a dual-boot machine
+
+## License
+
+MIT. See [LICENSE](LICENSE).

@@ -1,0 +1,35 @@
+{
+  "_comment": "Copy to exodus.config.json (git-ignored) and edit. Keys starting with _ are ignored.",
+  "prefix": "exo",
+  "default_user": "alice",
+  "user_map": {
+    "alice": "alice",
+    "SYSTEM": "root"
+  },
+  "path_map": {
+    "C:\\Users\\Alice": "/home/alice",
+    "D:\\Data": "/srv/data"
+  },
+  "exclude": ["\\Microsoft\\*", "\\MicrosoftEdge*", "\\GoogleUpdate*", "\\OneDrive*", "\\NVIDIA*", "service:Spooler"],
+  "after": ["network-online.target"],
+  "trusted_interface": "tailscale0",
+  "persistent": true,
+  "exec_map": {
+    "\\Nightly Backup": {
+      "exec": "/usr/bin/rsync -a --delete /home/alice/Documents/ /mnt/nas/backup/Documents/",
+      "requires_mounts_for": ["/mnt/nas/backup"]
+    },
+    "\\MyApp\\Daily Collect": {
+      "exec": "/home/alice/projects/myapp/.venv/bin/python collect.py --delay 120",
+      "workdir": "/home/alice/projects/myapp",
+      "user": "alice",
+      "environment": { "TZ": "Europe/Paris" },
+      "credentials": ["api-token:/etc/myapp/api.token"]
+    },
+    "service:MyDashboard": {
+      "exec": "/home/alice/projects/myapp/.venv/bin/python -m streamlit run dashboard.py --server.port 8501",
+      "workdir": "/home/alice/projects/myapp",
+      "after": ["remote-fs.target"]
+    }
+  }
+}
