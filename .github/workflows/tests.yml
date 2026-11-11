@@ -1,0 +1,49 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.x"]   # 3.12 = Ubuntu 24.04's python3
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Shell syntax
+        run: for f in linux/*.sh scripts/*.sh; do bash -n "$f"; done
+      - name: Unit tests (converter, heartbeat, cifs-automount, Jellyfin; pwsh dry-run included)
+        run: python3 -m unittest discover -s tests -v
+
+  pester:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Pester (Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
+          Install-Module Pester -MinimumVersion 5.5.0 -Force -SkipPublisherCheck -Scope CurrentUser
+          Import-Module Pester -MinimumVersion 5.5.0
+          $r = Invoke-Pester tests -PassThru -Output Detailed
+          if ($r.FailedCount -gt 0) { exit 1 }
+      - name: Pester (PowerShell 7)
+        shell: pwsh
+        run: |
+          Install-Module Pester -MinimumVersion 5.5.0 -Force -SkipPublisherCheck -Scope CurrentUser
+          $r = Invoke-Pester tests -PassThru -Output Detailed
+          if ($r.FailedCount -gt 0) { exit 1 }

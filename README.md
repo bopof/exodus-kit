@@ -57,7 +57,7 @@ Vendor housekeeping (browser and driver updaters, OEM utilities, telemetry helpe
 | `jellyfin-carry-userdata.py`, Jellyfin 10.11+ database (EF Core `jellyfin.db`) | ✅ checked against a real Windows → Linux move: identical result to the hand-made import |
 | `run-monitored.sh` via systemd `LoadCredential` | ✅ run live against Uptime Kuma (push monitor) and self-hosted Healthchecks 5.0: up, down with the exit code, and a wrong URL reported without changing the job's exit code. Hosted healthchecks.io checked live too: up → down (exit status 3 shown) → up on a real check, and a wrong URL (HTTP 200 "OK (not found)") reported as a failed push |
 | `cifs-automount.sh` on Ubuntu 26.04 against a Synology NAS | ✅ applied for real (automount, read-only, path with space + accent, `--for` drop-in). The user/password prompt is tested under a pseudo-terminal. A local Samba test confirmed `mount.cifs` keeps leading/trailing spaces in a credentials-file password, so the file must hold it exactly |
-| `windows/*.ps1` on Windows 11, PowerShell 5.1, elevated | ✅ run on a real machine (preflight, export, Pester 43/43); Windows 10 untested, no CI |
+| `windows/*.ps1` on Windows 11, PowerShell 5.1, elevated | ✅ run on a real machine (preflight, export, Pester 43/43); Windows 10 untested. CI runs Pester on PowerShell 5.1 and 7 for every push |
 | Task or service names with accents or other non-ASCII characters | ⚠️ untested on real Windows (none on the test machine). The generated `.ps1` files are written UTF-8 with BOM so PowerShell 5.1 should read them correctly; reports welcome |
 
 `copy-from-windows.sh --root DIR` works from an already-mounted C: or a backup copy, without needing sudo.
@@ -84,6 +84,10 @@ scripts/leak-check.sh                      # before every push; add your own ide
 - [dennishilk/linux-migration-companion](https://github.com/dennishilk/linux-migration-companion): a local advisor that assesses your setup
 - [AlexP11223/qBTConverter](https://github.com/AlexP11223/qBTConverter): rewrites Windows paths in qBittorrent `.fastresume` files
 - [KeyofBlueS/bt-keys-sync](https://github.com/KeyofBlueS/bt-keys-sync): keeps Bluetooth pairings working on a dual-boot machine
+
+## Security
+
+Please report vulnerabilities privately, see [SECURITY.md](SECURITY.md).
 
 ## License
 

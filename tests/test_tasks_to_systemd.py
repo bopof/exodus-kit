@@ -214,7 +214,7 @@ class Units(unittest.TestCase):
                      "\\GoogleUpdaterTaskSystem140.0.0.0{X}", "\\NvTmRep_CrashReport1_{X}",
                      "service:gupdate", "service:GUPDATEM", "service:brave", "service:NVDisplay.ContainerLocalSystem"):
             self.assertFalse(cfg.wanted(name), name)
-        for name in ("\\UnattendedRig-WeeklyUpdateReboot", "\\AppServices-Watchdog", "\\Nightly Backup",
+        for name in ("\\Weekly Update Reboot", "\\App Watchdog", "\\Nightly Backup",
                      "service:MyDashboard", "\\HPC Jobs\\x", "service:bravo-api"):
             self.assertTrue(cfg.wanted(name), name)
         extra = t2s.Config(exclude_extra=["\\Nightly*"])
