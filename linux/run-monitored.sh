@@ -15,6 +15,7 @@
 # Flavours (HEARTBEAT_KIND, default: auto from the URL):
 #   kuma           Uptime Kuma push monitor (.../api/push/<token>): status=up|down, msg, ping=duration in ms
 #   healthchecks   healthchecks.io and compatible (hc-ping.com/<uuid>, self-hosted): GET <url>/<exit code>
+#                  (a "not found" answer counts as a failed push: hosted healthchecks.io sends it with HTTP 200)
 #   plain          GET <url> on success only; your monitor alerts when pings stop
 set -uo pipefail
 
@@ -47,9 +48,14 @@ if [[ $kind == auto ]]; then
 fi
 
 push() {
-    local tries="${HEARTBEAT_TRIES:-3}" i
+    local tries="${HEARTBEAT_TRIES:-3}" i body
     for (( i = 1; i <= tries; i++ )); do
-        curl -fsS -m "${HEARTBEAT_TIMEOUT:-30}" -o /dev/null "$@" && return 0
+        if body=$(curl -fsS -m "${HEARTBEAT_TIMEOUT:-30}" "$@"); then
+            # Hosted healthchecks.io answers an unknown UUID with HTTP 200 "OK (not found)" (self-hosted: 404).
+            # Not worth retrying: the URL is wrong.
+            [[ $kind == healthchecks && $body == *"not found"* ]] && { echo "run-monitored: $body" >&2; return 1; }
+            return 0
+        fi
         (( i < tries )) && sleep "${HEARTBEAT_RETRY_SLEEP:-10}"
     done
     return 1

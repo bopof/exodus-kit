@@ -12,8 +12,9 @@ from test_tasks_to_systemd import ROOT, t2s
 
 WRAPPER = ROOT / "linux" / "run-monitored.sh"
 FAKE_CURL = """#!/bin/sh
-# fake curl: logs its arguments (one line per call), fails when $FAKE_CURL_FAIL is set
+# fake curl: logs its arguments (one line per call), prints $FAKE_CURL_BODY, fails when $FAKE_CURL_FAIL is set
 echo "$*" >> "$FAKE_LOG"
+[ -n "$FAKE_CURL_BODY" ] && printf '%s' "$FAKE_CURL_BODY"
 [ -z "$FAKE_CURL_FAIL" ]
 """
 
@@ -79,6 +80,16 @@ class Wrapper(unittest.TestCase):
         self.assertEqual(len(calls), 3)                        # 3 tries
         self.assertTrue(all("from-cred/0" in c for c in calls))
         self.assertIn("heartbeat push failed", p.stderr)
+
+    def test_healthchecks_hosted_not_found_is_a_failed_push(self):
+        # hosted hc-ping.com: unknown UUID -> HTTP 200, body "OK (not found)"; no retry, job exit code kept
+        p, calls = self.run_job("exit 0", HEARTBEAT_URL="https://hc-ping.com/0000", FAKE_CURL_BODY="OK (not found)")
+        self.assertEqual((p.returncode, len(calls)), (0, 1))
+        self.assertIn("heartbeat push failed", p.stderr)
+        self.assertIn("OK (not found)", p.stderr)
+        self.log.unlink()
+        p, calls = self.run_job("exit 0", HEARTBEAT_URL="https://hc-ping.com/0000", FAKE_CURL_BODY="OK")
+        self.assertNotIn("push failed", p.stderr)
 
     def test_no_command(self):
         p = subprocess.run(["bash", str(WRAPPER), "x", "--"], capture_output=True, text=True, env=self.env)
