@@ -96,6 +96,106 @@ class SampleInventory(unittest.TestCase):
         self.assertEqual(bad, [])
 
 
+class Cutover(unittest.TestCase):
+    """The generated cutover/rollback scripts, run in dry-run mode against fakes."""
+    FAKE_SYSTEMCTL = """#!/bin/sh
+# fake: 'show -P FragmentPath UNIT' prints $FAKE_ETC/UNIT if it exists, anything else is logged
+if [ "$1" = show ]; then [ -f "$FAKE_ETC/$4" ] && echo "$FAKE_ETC/$4"; exit 0; fi
+echo "$@" >> "$FAKE_ETC/calls.log"
+"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.out = Path(cls.tmp.name) / "out"
+        t2s.main([str(ROOT / "examples/inventory.sample.json"),
+                  "-c", str(ROOT / "examples/exodus.config.sample-test.json"), "-o", str(cls.out)])
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def run_sh(self, script, etc, *args):
+        import os
+        bindir = Path(self.tmp.name) / "bin"
+        bindir.mkdir(exist_ok=True)
+        (bindir / "systemctl").write_text(self.FAKE_SYSTEMCTL)
+        (bindir / "systemctl").chmod(0o755)
+        env = dict(os.environ, PATH=f"{bindir}:{os.environ['PATH']}", FAKE_ETC=str(etc))
+        return subprocess.run(["bash", str(self.out / script), *args], capture_output=True, text=True, env=env)
+
+    def install(self, name, ported_only=False):
+        etc = Path(self.tmp.name) / name
+        etc.mkdir()
+        for f in self.out.glob("exo-*.*"):
+            body = f.read_text()
+            if ported_only:
+                body = body.replace("is not ported yet", "was a TODO")
+            (etc / f.name).write_text(body)
+        return etc
+
+    def test_lists(self):
+        sh = (self.out / "cutover-linux.sh").read_text()
+        self.assertIn("exo-job-nightly-backup.timer", sh)
+        self.assertIn("exo-mydashboard.service", sh)
+        self.assertNotIn("exo-job-disabled-task.timer", sh)      # disabled on Windows -> not enabled
+        self.assertNotIn("exo-job-at-logon", sh)                  # no timer -> nothing to enable
+        self.assertIn("exo-job-at-logon.service", (self.out / "rollback-linux.sh").read_text())
+        ps = (self.out / "rollback-windows.ps1").read_bytes()
+        self.assertTrue(ps.startswith(b"\xef\xbb\xbf") and b"\r\n" in ps)  # BOM + CRLF for PS 5.1
+        self.assertIn(b"Path = '\\MyApp\\'; Name = 'Daily Collect'", ps)
+        self.assertIn("cutover-linux.sh", (self.out / "REPORT.md").read_text())
+
+    def test_ps_quote(self):
+        self.assertEqual(t2s.ps_quote("Bob's \u2019task"), "'Bob''s \u2019\u2019task'")
+        self.assertEqual(t2s.split_task("\\A\\B\\name"), ("\\A\\B\\", "name"))
+        self.assertEqual(t2s.split_task("name"), ("\\", "name"))
+
+    def test_linux_refuses_when_not_installed(self):
+        p = self.run_sh("cutover-linux.sh", Path(self.tmp.name), "--dry-run")
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("Not installed", p.stderr)
+
+    def test_linux_refuses_unported(self):
+        p = self.run_sh("cutover-linux.sh", self.install("etc-todo"), "--dry-run")
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("not ported yet", p.stderr)
+
+    def test_linux_dry_run_ok(self):
+        etc = self.install("etc-ok", ported_only=True)
+        p = self.run_sh("cutover-linux.sh", etc, "--dry-run")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("would enable --now: exo-mydashboard.service", p.stdout)
+        p = self.run_sh("rollback-linux.sh", etc, "--dry-run")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertFalse((etc / "calls.log").exists())                # dry run changed nothing
+
+    def test_linux_needs_root(self):
+        import os
+        if os.geteuid() == 0:
+            self.skipTest("running as root")
+        self.assertEqual(self.run_sh("rollback-linux.sh", Path(self.tmp.name)).returncode, 1)
+
+    @unittest.skipUnless(shutil.which("pwsh"), "needs pwsh")
+    def test_windows_dry_run(self):
+        stubs = (
+            "function Get-ScheduledTask { param($TaskPath, $TaskName, $ErrorAction) "
+            "[pscustomobject]@{ TaskPath = $TaskPath; TaskName = $TaskName; "
+            "State = $(if ($TaskName -eq 'Nightly Backup') { 'Running' } else { 'Ready' }) } }; "
+            "function Get-Service { param($Name, $ErrorAction) [pscustomobject]@{ Name = $Name; Status = 'Running' } }; ")
+        p = subprocess.run(["pwsh", "-NoProfile", "-NonInteractive", "-c",
+                            stubs + f"& '{self.out}/cutover-windows.ps1' -DryRun; exit $LASTEXITCODE"],
+                           capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("would stop + disable service  MyDashboard", p.stdout)
+        self.assertIn("STILL RUNNING: \\Nightly Backup", p.stdout + p.stderr)
+        p = subprocess.run(["pwsh", "-NoProfile", "-NonInteractive", "-c",
+                            stubs + f"& '{self.out}/rollback-windows.ps1' -DryRun; exit $LASTEXITCODE"],
+                           capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("left disabled (it was at export)  \\Disabled Task", p.stdout)
+
+
 class Units(unittest.TestCase):
     def test_iso_duration(self):
         self.assertEqual(t2s.iso_duration_seconds("PT1H30M"), 5400)

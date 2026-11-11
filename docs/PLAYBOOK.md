@@ -114,6 +114,8 @@ Default to `ufw default deny incoming`. Open each app port **only on the interfa
 
 ## Phase 6: Cutover
 
+`tasks-to-systemd.py` writes four scripts into `out/` for the units it generated: `cutover-windows.ps1` (step 1), `cutover-linux.sh` (step 4), `rollback-linux.sh` and `rollback-windows.ps1`. Run each one with `-DryRun` / `--dry-run` first. `cutover-linux.sh` refuses to run while a unit is missing from systemd or still "not ported yet". Below is what they do, so you can also do it by hand.
+
 1. **On Windows:** stop and disable the services and scheduled tasks you ported. Then check that **none are still running**: `Disable-ScheduledTask` doesn't stop a run already in progress, and copying a half-written database is how you lose data.
    ```powershell
    Get-ScheduledTask | Where-Object State -eq 'Running' | Select-Object TaskPath, TaskName
@@ -129,8 +131,8 @@ Default to `ufw default deny incoming`. Open each app port **only on the interfa
 
 ### Rollback
 
-1. Boot Windows. Re-enable its services and tasks (the reverse of step 1).
-2. On Linux: `sudo systemctl disable --now '<prefix>-*'`.
+1. On Linux: `sudo out/rollback-linux.sh` (or `sudo systemctl disable --now '<prefix>-*'`). Linux first, so the two machines never run the same jobs.
+2. Boot Windows. Re-enable its services and tasks with `out/rollback-windows.ps1` from an admin PowerShell (the reverse of step 1; tasks that were already disabled at export stay disabled).
 3. Swap the identity back.
 4. **Data written on Linux after cutover has to be copied back by hand.** Linux had Windows mounted read-only, so use a network share or SSH.
 

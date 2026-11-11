@@ -124,7 +124,8 @@ if ($isAdmin) {
 $rst = @(Get-CimInstance Win32_SystemDriver -ErrorAction SilentlyContinue |
   Where-Object { $_.Name -match '^iaStor' -and $_.State -eq 'Running' })
 if ($rst) {
-  Add-Result 'WARN' 'Storage mode' "Intel RST/VMD driver active ($(($rst.Name) -join ', '))" `
+  # INFO, not WARN: the only real-hardware data point (Ubuntu 26.04 behind VMD) installed fine.
+  Add-Result 'INFO' 'Storage mode' "Intel RST/VMD driver active ($(($rst.Name) -join ', '))" `
     'Linux has a vmd driver and a recent installer may work as is (Ubuntu 26.04 did on the reference machine); older installers may not see the drives or may refuse. If the installer lists no disk or complains about RST, switch the firmware to AHCI / disable VMD, booting Windows once in Safe Mode first so it loads the AHCI driver'
 } else { Add-Result 'PASS' 'Storage mode' 'no Intel RST/VMD driver running' }
 

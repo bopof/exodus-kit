@@ -14,7 +14,7 @@ It started from a real migration (a Windows 11 desktop that also acted as a home
 | [`docs/PITFALLS.md`](docs/PITFALLS.md) | Problems we actually hit, each with its fix |
 | [`windows/preflight.ps1`](windows/preflight.ps1) | Read-only checks before you install anything: Fast Startup, hibernation, BitLocker, clock, Secure Boot, disks, running tasks |
 | [`windows/export-windows.ps1`](windows/export-windows.ps1) | Exports your scheduled tasks (full XML), third-party services (including NSSM wrappers), installed apps and inbound firewall rules to one JSON file. Secrets are redacted |
-| [`linux/tasks-to-systemd.py`](linux/tasks-to-systemd.py) | Turns that export into systemd `.service` and `.timer` files, plus a report of anything it couldn't translate exactly |
+| [`linux/tasks-to-systemd.py`](linux/tasks-to-systemd.py) | Turns that export into systemd `.service` and `.timer` files, a report of anything it couldn't translate exactly, and cutover/rollback scripts for both sides, for exactly those units |
 | [`linux/copy-from-windows.sh`](linux/copy-from-windows.sh) | Mounts the Windows partition **read-only** and copies your profile folders, skipping what can be rebuilt. Can re-sync at cutover |
 | [`linux/tpm-unlock.sh`](linux/tpm-unlock.sh) | Unlocks LUKS from the TPM so the machine can reboot without anyone typing a passphrase. Works with dracut and with initramfs-tools |
 | [`scripts/leak-check.sh`](scripts/leak-check.sh) | Scans for secrets and personal identifiers before you share an export or push a fork |
@@ -40,7 +40,7 @@ less out/REPORT.md                                                  # read this 
 sudo linux/tpm-unlock.sh --check                                    # optional, needed for unattended reboots
 ```
 
-The units generated in `out/` are **never enabled by the generator**. You install them disabled, test each one by hand, and enable them all at cutover. The playbook explains why.
+The units generated in `out/` are **never enabled by the generator**. You install them disabled, test each one by hand, and enable them all at cutover with the generated `out/cutover-windows.ps1` and `out/cutover-linux.sh` (both have a dry-run mode; `rollback-*` undo them). The playbook explains why.
 
 ## Tested on
 
@@ -49,7 +49,7 @@ The units generated in `out/` are **never enabled by the generator**. You instal
 | Ubuntu 26.04 LTS · NVIDIA (signed prebuilt driver) · Secure Boot on · dracut · LUKS+LVM | ✅ used for a real migration |
 | Ubuntu 24.04 / 25.x · initramfs-tools + clevis path | ⚠️ written, not yet verified end-to-end |
 | Fedora, Linux Mint, Debian, Arch, AMD GPUs | ❓ untested. The method applies; package names and the initramfs step differ. Reports welcome |
-| `windows/*.ps1` on Windows 10/11, PowerShell 5.1 | ⚠️ written for it, not yet run in CI |
+| `windows/*.ps1` on Windows 11, PowerShell 5.1, elevated | ✅ run on a real machine (preflight, export, Pester 43/43); Windows 10 untested, no CI |
 
 `copy-from-windows.sh --root DIR` works from an already-mounted C: or a backup copy, without needing sudo.
 
