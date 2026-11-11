@@ -116,6 +116,8 @@ Default to `ufw default deny incoming`. Open each app port **only on the interfa
 
 `tasks-to-systemd.py` writes four scripts into `out/` for the units it generated: `cutover-windows.ps1` (step 1), `cutover-linux.sh` (step 4), `rollback-linux.sh` and `rollback-windows.ps1`. Run each one with `-DryRun` / `--dry-run` first. `cutover-linux.sh` refuses to run while a unit is missing from systemd or still "not ported yet". Below is what they do, so you can also do it by hand.
 
+`cutover-windows.ps1` waits only for **time-triggered** jobs. Tasks started at logon, at boot or by an event are usually agents that never finish (a vendor power or fan helper, for example). The script lists them as "not waited for", and the shutdown ends them.
+
 1. **On Windows:** stop and disable the services and scheduled tasks you ported. Then check that **none are still running**: `Disable-ScheduledTask` doesn't stop a run already in progress, and copying a half-written database is how you lose data.
    ```powershell
    Get-ScheduledTask | Where-Object State -eq 'Running' | Select-Object TaskPath, TaskName

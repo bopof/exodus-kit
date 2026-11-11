@@ -80,6 +80,11 @@ class SampleInventory(unittest.TestCase):
 
     def test_excludes(self):
         self.assertFalse((self.out / "exo-job-excludedbyconfig.service").exists())
+        self.assertIn("Wait = $true", (self.out / "cutover-windows.ps1").read_text(encoding="utf-8-sig"))
+        ps = (self.out / "cutover-windows.ps1").read_text(encoding="utf-8-sig")
+        self.assertIn("Name = 'At Logon'; WasDisabled = $false; Wait = $false", ps)
+        self.assertIn("Name = 'At Boot'; WasDisabled = $false; Wait = $false", ps)
+        self.assertIn("Name = 'Every 15 Minutes'; WasDisabled = $false; Wait = $true", ps)
 
     def test_firewall_and_apps(self):
         r = (self.out / "REPORT.md").read_text()
@@ -181,7 +186,7 @@ echo "$@" >> "$FAKE_ETC/calls.log"
         stubs = (
             "function Get-ScheduledTask { param($TaskPath, $TaskName, $ErrorAction) "
             "[pscustomobject]@{ TaskPath = $TaskPath; TaskName = $TaskName; "
-            "State = $(if ($TaskName -eq 'Nightly Backup') { 'Running' } else { 'Ready' }) } }; "
+            "State = $(if ($TaskName -in 'Nightly Backup', 'At Logon') { 'Running' } else { 'Ready' }) } }; "
             "function Get-Service { param($Name, $ErrorAction) [pscustomobject]@{ Name = $Name; Status = 'Running' } }; ")
         p = subprocess.run(["pwsh", "-NoProfile", "-NonInteractive", "-c",
                             stubs + f"& '{self.out}/cutover-windows.ps1' -DryRun; exit $LASTEXITCODE"],
@@ -189,6 +194,8 @@ echo "$@" >> "$FAKE_ETC/calls.log"
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertIn("would stop + disable service  MyDashboard", p.stdout)
         self.assertIn("STILL RUNNING: \\Nightly Backup", p.stdout + p.stderr)
+        self.assertNotIn("At Logon", (p.stdout + p.stderr).split("STILL RUNNING")[1])   # agent: not waited for
+        self.assertIn("not waited for (logon/boot/event task, the shutdown ends it): \\At Logon", p.stdout)
         p = subprocess.run(["pwsh", "-NoProfile", "-NonInteractive", "-c",
                             stubs + f"& '{self.out}/rollback-windows.ps1' -DryRun; exit $LASTEXITCODE"],
                            capture_output=True, text=True)
@@ -197,6 +204,22 @@ echo "$@" >> "$FAKE_ETC/calls.log"
 
 
 class Units(unittest.TestCase):
+    def test_vendor_excludes_case_insensitive(self):
+        cfg = t2s.Config()
+        for name in ("\\ASUS\\AcPowerNotification", "\\asus\\ASUSUpdateTaskMachineCore",
+                     "\\BraveSoftwareUpdateTaskMachineCore{0F7B4B0E-1E7A-4B3A-9A4C-000000000000}",
+                     "\\GoogleUpdaterTaskSystem140.0.0.0{X}", "\\NvTmRep_CrashReport1_{X}",
+                     "service:gupdate", "service:GUPDATEM", "service:brave", "service:NVDisplay.ContainerLocalSystem"):
+            self.assertFalse(cfg.wanted(name), name)
+        for name in ("\\UnattendedRig-WeeklyUpdateReboot", "\\AppServices-Watchdog", "\\Nightly Backup",
+                     "service:MyDashboard", "\\HPC Jobs\\x", "service:bravo-api"):
+            self.assertTrue(cfg.wanted(name), name)
+        extra = t2s.Config(exclude_extra=["\\Nightly*"])
+        self.assertFalse(extra.wanted("\\nightly backup"))
+        self.assertFalse(extra.wanted("\\ASUS\\AcPowerNotification"))        # defaults kept
+        self.assertTrue(t2s.Config(exclude=[]).wanted("\\ASUS\\AcPowerNotification"))
+        self.assertEqual(t2s.Config(include=["\\A*"]).excluded_by("\\B"), "(not in include)")
+
     def test_iso_duration(self):
         self.assertEqual(t2s.iso_duration_seconds("PT1H30M"), 5400)
         self.assertEqual(t2s.iso_duration_seconds("P1D"), 86400)

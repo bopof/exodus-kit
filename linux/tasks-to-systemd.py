@@ -40,8 +40,31 @@ WELL_KNOWN_SIDS = {
     "localsystem": "SYSTEM", "nt authority\\system": "SYSTEM",
     "nt authority\\localservice": "LOCAL SERVICE", "nt authority\\networkservice": "NETWORK SERVICE",
 }
-DEFAULT_EXCLUDES = ["\\Microsoft\\*", "\\MicrosoftEdge*", "\\GoogleUpdate*", "\\OneDrive*",
-                    "\\Mozilla\\*", "\\NvTm*", "\\NVIDIA*", "\\Adobe*"]
+# Default excludes: OS and vendor housekeeping (updaters, telemetry, hardware utilities) that has no
+# place on Linux. Matched case-insensitively. Tasks are matched on their full path, services as
+# "service:<name>". `exclude` in the config replaces this list; `exclude_extra` adds to it.
+DEFAULT_EXCLUDES = [
+    # tasks
+    "\\Microsoft\\*", "\\MicrosoftEdge*", "\\OneDrive*", "\\SoftLanding\\*", "\\Xbox*",
+    "\\GoogleUpdate*", "\\GoogleUserPEH*", "\\GoogleSystem\\*", "\\BraveSoftwareUpdate*", "\\Mozilla\\*",
+    "\\Opera scheduled Autoupdate*", "\\NvTm*", "\\NVIDIA*", "\\NvDriver*", "\\NvProfile*", "\\Adobe*",
+    "\\ASUS\\*", "\\ASUS*", "\\Lenovo\\*", "\\Dell\\*", "\\HP\\*", "\\Hewlett-Packard\\*",
+    "\\Intel\\*", "\\AMD\\*", "\\Apple\\*", "\\CCleaner*", "\\Avast*", "\\McAfee\\*", "\\Norton*",
+    "\\CreateExplorerShellUnelevatedTask", "\\VivaldiUpdateCheck*", "\\ViGEmBus_Updater", "\\MSIAfterburner*",
+    # services
+    "service:gupdate*", "service:GoogleUpdater*", "service:brave", "service:bravem",
+    "service:BraveElevationService", "service:edgeupdate*", "service:MozillaMaintenance",
+    "service:NVDisplay.Container*", "service:NvContainer*", "service:nvagent", "service:Asus*",
+    "service:ArmouryCrate*", "service:ROG*", "service:Adobe*", "service:AGSService", "service:AMD *",
+    "service:Lenovo*", "service:Dell*", "service:HP*", "service:Steam Client Service", "service:Razer*",
+    "service:LGHUB*", "service:logi_*", "service:OptionsPlusUpdaterService", "service:CCleaner*",
+    "service:asComSvc", "service:GameInputRedistService", "service:GameSDK Service", "service:XboxService",
+    # installed natively on Linux (its own package and unit), not ported from Windows
+    "service:Tailscale",
+]
+
+
+AUTO_START = ("automatic", "auto", "autodelayedstart", "automaticdelayedstart")
 
 
 # --------------------------------------------------------------------------- helpers
@@ -100,6 +123,7 @@ class Config:
     path_map: dict = field(default_factory=dict)
     include: list = field(default_factory=list)
     exclude: list = field(default_factory=lambda: list(DEFAULT_EXCLUDES))
+    exclude_extra: list = field(default_factory=list)
     exec_map: dict = field(default_factory=dict)
     after: list = field(default_factory=lambda: ["network-online.target"])
     trusted_interface: str = "<trusted-iface>"
@@ -139,10 +163,18 @@ class Config:
             return "root", f"ran as {name} on Windows -> root here; consider a dedicated user"
         return self.default_user, f"Windows user '{name}' not in user_map -> {self.default_user}"
 
+    def excluded_by(self, full_path: str) -> str | None:
+        """The pattern that leaves this task/service out, or None. Case-insensitive, like Windows."""
+        low = full_path.lower()
+        for pat in list(self.exclude) + list(self.exclude_extra):
+            if fnmatch.fnmatchcase(low, pat.lower()):
+                return pat
+        if self.include and not any(fnmatch.fnmatchcase(low, p.lower()) for p in self.include):
+            return "(not in include)"
+        return None
+
     def wanted(self, full_path: str) -> bool:
-        if any(fnmatch.fnmatch(full_path, pat) for pat in self.exclude):
-            return False
-        return not self.include or any(fnmatch.fnmatch(full_path, pat) for pat in self.include)
+        return self.excluded_by(full_path) is None
 
     def exec_for(self, *keys: str) -> dict | None:
         for k in keys:
@@ -325,6 +357,7 @@ class Result:
     disabled_on_windows: bool = False
     start_type: str = ""          # services: Windows start type, restored at rollback
     has_timer: bool = False       # tasks: a .timer was written (else nothing to enable)
+    scheduled: bool = False       # tasks: time-triggered job (cutover waits for it); else an agent
 
 
 def convert_task(cfg: Config, task: dict, out: Path) -> Result | None:
@@ -385,11 +418,12 @@ def convert_task(cfg: Config, task: dict, out: Path) -> Result | None:
         [f"OnBootSec={human_seconds(sched.on_boot_sec)}"] if sched.on_boot_sec else []) + (
         [f"OnUnitActiveSec={human_seconds(sched.on_unit_active_sec)}"] if sched.on_unit_active_sec else []),
         sched.notes, sched.skipped, win_cmds, not enabled,
-        has_timer=bool(sched.on_calendar or sched.on_boot_sec or sched.on_unit_active_sec))
+        has_timer=bool(sched.on_calendar or sched.on_boot_sec or sched.on_unit_active_sec),
+        scheduled=bool(sched.on_calendar or sched.on_unit_active_sec))
 
 
 def convert_service(cfg: Config, s: dict, out: Path) -> Result | None:
-    if (s.get("startType") or "").lower() not in ("automatic", "auto", "autodelayedstart", "automaticdelayedstart"):
+    if (s.get("startType") or "").lower() not in AUTO_START:
         return None
     if not cfg.wanted("service:" + s["name"]):
         return None
@@ -434,7 +468,8 @@ def validate(results: list[Result]) -> list[str]:
     return errs
 
 
-def report(cfg: Config, inv: dict, results: list[Result], out: Path, errors: list[str]) -> None:
+def report(cfg: Config, inv: dict, results: list[Result], out: Path, errors: list[str],
+           excluded: list | None = None) -> None:
     tasks = [r for r in results if r.kind == "task"]
     svcs = [r for r in results if r.kind == "service"]
     todo = [r for r in results if not r.ported]
@@ -472,6 +507,12 @@ def report(cfg: Config, inv: dict, results: list[Result], out: Path, errors: lis
         sched = "<br>".join(f"`{c}`" for c in r.schedule) or ("service" if r.kind == "service" else "—")
         L.append(f"| `{r.unit}` | {r.name.replace('|', '/')} | {sched} | {'✅' if r.ported else '❌ TODO'} | "
                  f"{notes.replace('|', '/')} |")
+    if excluded:
+        L += ["", f"## Left out ({len(excluded)})", "",
+              "Matched an exclude pattern (vendor updaters and utilities by default). To port one, set "
+              "`exclude` in the config (it replaces the defaults) or remove the pattern there.", "",
+              "| Windows | Pattern |", "|---|---|"]
+        L += [f"| {n.replace('|', '/')} | `{p}` |" for n, p in excluded]
     fw = inv.get("firewall") or []
     if fw:
         L += ["", "## Firewall (inbound allow rules found on Windows)", "",
@@ -517,6 +558,8 @@ CUTOVER_PS = PS_HEAD + r"""<#
   disable the ported services, then WAIT until none of those tasks is still running.
   Disable-ScheduledTask does not stop a run in progress, and copying a half-written file is how
   you lose data. Running tasks are not killed: the script waits, then fails if they are still busy.
+  It waits only for time-triggered jobs (Wait = $true). Tasks started at logon, at boot or by an
+  event are usually agents that never finish; they are listed, and the shutdown ends them.
   Exit 0 = safe to shut down (shutdown /s /t 0). Exit 1 = something is still running or failed.
 #>
 param([int]$WaitMinutes = 30, [switch]$DryRun)
@@ -547,12 +590,18 @@ foreach ($s in $Services) {
 }
 $deadline = (Get-Date).AddMinutes($WaitMinutes)
 while ($true) {
-  $running = @($Tasks | ForEach-Object {
+  $running = @($Tasks | Where-Object Wait | ForEach-Object {
     Get-ScheduledTask -TaskPath $_.Path -TaskName $_.Name -ErrorAction SilentlyContinue |
       Where-Object State -eq 'Running' })
   if (-not $running.Count -or $DryRun -or (Get-Date) -ge $deadline) { break }
   "still running: $(($running | ForEach-Object { $_.TaskPath + $_.TaskName }) -join ', ') - waiting"
   Start-Sleep -Seconds 15
+}
+$agents = @($Tasks | Where-Object { -not $_.Wait } | ForEach-Object {
+  Get-ScheduledTask -TaskPath $_.Path -TaskName $_.Name -ErrorAction SilentlyContinue |
+    Where-Object State -eq 'Running' })
+if ($agents.Count) {
+  "running, not waited for (logon/boot/event task, the shutdown ends it): $(($agents | ForEach-Object { $_.TaskPath + $_.TaskName }) -join ', ')"
 }
 if ($running.Count) {
   Write-Warning "STILL RUNNING: $(($running | ForEach-Object { $_.TaskPath + $_.TaskName }) -join ', ')"
@@ -656,7 +705,8 @@ def write_cutover(cfg: Config, results: list[Result], out: Path) -> None:
     tasks = [r for r in results if r.kind == "task"]
     svcs = [r for r in results if r.kind == "service"]
     ps_tasks = ",\n".join(
-        "  @{ Path = %s; Name = %s; WasDisabled = $%s }" % (ps_quote(p), ps_quote(n), str(r.disabled_on_windows).lower())
+        "  @{ Path = %s; Name = %s; WasDisabled = $%s; Wait = $%s }" % (
+            ps_quote(p), ps_quote(n), str(r.disabled_on_windows).lower(), str(r.scheduled).lower())
         for r in tasks for p, n in [split_task(r.name)])
     ps_svcs = ",\n".join("  @{ Name = %s; StartType = %s }" % (ps_quote(r.name), ps_quote(r.start_type)) for r in svcs)
     for name, tpl in (("cutover-windows.ps1", CUTOVER_PS), ("rollback-windows.ps1", ROLLBACK_PS)):
@@ -708,7 +758,11 @@ def main(argv=None) -> int:
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     results: list[Result] = []
+    excluded: list[tuple[str, str]] = []
     for t in inv.get("scheduledTasks") or []:
+        full = (t.get("path") or "\\") + t.get("name", "")
+        if (pat := cfg.excluded_by(full)) and not pat.startswith("\\Microsoft\\"):
+            excluded.append((full, pat))
         try:
             r = convert_task(cfg, t, out)
         except ET.ParseError as e:
@@ -717,15 +771,19 @@ def main(argv=None) -> int:
         if r:
             results.append(r)
     for s in inv.get("services") or []:
+        auto = (s.get("startType") or "").lower() in AUTO_START
+        if auto and (pat := cfg.excluded_by("service:" + s["name"])):
+            excluded.append(("service:" + s["name"], pat))
         r = convert_service(cfg, s, out)
         if r:
             results.append(r)
     errors = validate(results) if a.validate else []
-    report(cfg, inv, results, out, errors)
+    report(cfg, inv, results, out, errors, excluded)
     write_cutover(cfg, results, out)
     write_apps(inv, out)
     todo = sum(not r.ported for r in results)
-    print(f"{len(results)} unit(s) written to {out}/ ({todo} still need exec_map). Read {out}/REPORT.md")
+    print(f"{len(results)} unit(s) written to {out}/ ({todo} still need exec_map, "
+          f"{len(excluded)} left out by exclude). Read {out}/REPORT.md")
     for e in errors:
         print("ERROR:", e, file=sys.stderr)
     return 1 if errors else 0

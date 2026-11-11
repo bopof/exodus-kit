@@ -10,7 +10,8 @@
     "C:\\Users\\Alice": "/home/alice",
     "D:\\Data": "/srv/data"
   },
-  "exclude": ["\\Microsoft\\*", "\\MicrosoftEdge*", "\\GoogleUpdate*", "\\OneDrive*", "\\NVIDIA*", "service:Spooler"],
+  "_exclude": "Vendor updaters/utilities are left out by default (see DEFAULT_EXCLUDES). exclude_extra adds patterns; exclude replaces the defaults.",
+  "exclude_extra": ["\\MyOldStuff\\*", "service:Spooler"],
   "after": ["network-online.target"],
   "trusted_interface": "tailscale0",
   "persistent": true,
